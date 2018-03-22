@@ -20,8 +20,10 @@ DEBUG = 0
 TIMEOUT = 60
 MB = 1048576
 NOTIFY_SIZE = 1000000
+#RECIPIENTS = "gwarnold@illinois.edu"
 RECIPIENTS = "gwarnold@illinois.edu,gbauer@illinois.edu"
 DISPLAY_ONLY_SIZE = 50000
+#SLEEP_DELAY = 60
 SLEEP_DELAY = 3600
 # To keep things simple, this is the same test space on jyc, bw, and nearline
 TOKEN_FILE = 'refresh-tokens.json'
@@ -120,6 +122,14 @@ def my_endpoint_manager_task_list(tclient,ep):
                 source_total_bps += task["effective_bytes_per_second"]
                 source_total_tasks += 1
             if (task["destination_endpoint_id"] == ep) and (task["source_endpoint_id"] == ep):
+                if (task["owner_string"] == "arnoldg@globusid.org"):
+                    if not task["is_paused"]:
+                        tclient.endpoint_manager_pause_tasks([task["task_id"] ],"SRC and DEST endpoint are the same.  Please contact help+bw@ncsa.illinois.edu .")
+                        print("{} for {} PAUSED.".format(task["task_id"],task["owner_string"]))
+                    else:
+                        print("{} for {} was already PAUSED.".format(task["task_id"],task["owner_string"]))
+                        continue
+                    
                 endpoint_is = "DEST_SRC"
                 dest_total_files += task["files"]
                 dest_total_bps += task["effective_bytes_per_second"]
