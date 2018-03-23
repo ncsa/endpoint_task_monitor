@@ -20,11 +20,13 @@ DEBUG = 0
 TIMEOUT = 60
 MB = 1048576
 NOTIFY_SIZE = 1000000
+RECIPIENTS = "gwarnold@illinois.edu,gbauer@illinois.edu"
 RECIPIENTS = "gwarnold@illinois.edu"
-#RECIPIENTS = "gwarnold@illinois.edu,gbauer@illinois.edu"
+GLOBUS_CONSOLE = "https://www.globus.org/app/console/tasks/"
 DISPLAY_ONLY_SIZE = 50000
-#SLEEP_DELAY = 60
+PAUSE_SIZE = 1000
 SLEEP_DELAY = 3600
+SLEEP_DELAY = 300
 # To keep things simple, this is the same test space on jyc, bw, and nearline
 TOKEN_FILE = 'refresh-tokens.json'
 REDIRECT_URI = 'https://auth.globus.org/v2/web/auth-code'
@@ -126,11 +128,10 @@ def my_endpoint_manager_task_list(tclient,ep):
                     if not task["is_paused"]:
                         tclient.endpoint_manager_pause_tasks([task["task_id"] ],"SRC and DEST endpoint are the same.  Please contact help+bw@ncsa.illinois.edu .")
                         print("{} for {} PAUSED.".format(task["task_id"],task["owner_string"]))
-                        os.system("echo " + "nfiles=" + str(task["files"]) + "_taskid=" + str(task["task_id"]) + "| mail -s " + "PAUSED:" + task["owner_string"] + " " + RECIPIENTS )
+                        os.system("echo " + GLOBUS_CONSOLE + str(task["task_id"]) + " | mail -s " + "PAUSED_SRC=DEST:" + task["owner_string"] + " " + RECIPIENTS )
                     else:
                         print("{} for {} was already PAUSED.".format(task["task_id"],task["owner_string"]))
                         continue
-                    
                 endpoint_is = "DEST_SRC"
                 dest_total_files += task["files"]
                 dest_total_bps += task["effective_bytes_per_second"]
@@ -138,6 +139,15 @@ def my_endpoint_manager_task_list(tclient,ep):
                 source_total_files += task["files"]
                 source_total_bps += task["effective_bytes_per_second"]
                 source_total_tasks += 1
+            if task["files"] > PAUSE_SIZE:
+                if (task["owner_string"] == "arnoldg@globusid.org"):
+                    if not task["is_paused"]:
+                        tclient.endpoint_manager_pause_tasks([task["task_id"] ],"File Count exceeds endpoint transfer limit.  Please contact help+bw@ncsa.illinois.edu .")
+                        print("{} for {} PAUSED.".format(task["task_id"],task["owner_string"]))
+                        os.system("echo " + GLOBUS_CONSOLE + str(task["task_id"]) + " | mail -s " + "PAUSED_NFILES:" + task["owner_string"] + " " + RECIPIENTS )
+                    else:
+                        print("{} for {} was already PAUSED.".format(task["task_id"],task["owner_string"]))
+                        continue
             if (task["files"] > DISPLAY_ONLY_SIZE) or (endpoint_is == "DEST_SRC"):
                 print("{1:10s} {2:36s} {3:10d} {0}".format(
                     task["owner_string"], endpoint_is,
