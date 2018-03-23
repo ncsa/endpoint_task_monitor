@@ -8,7 +8,6 @@ Based on tutorial and documentation at:
 -Galen Arnold, 2018, NCSA
 """
 import time
-import datetime
 import os
 import globus_sdk
 import json
@@ -19,15 +18,16 @@ CLIENT_ID = '231634e4-37cc-4a06-96ce-12a262a62da7'
 DEBUG = 0
 TIMEOUT = 60
 MB = 1048576
-NOTIFY_SIZE = 1000000
+NOTIFY_SIZE = 100000
 RECIPIENTS = "gwarnold@illinois.edu,gbauer@illinois.edu"
 RECIPIENTS = "gwarnold@illinois.edu"
 GLOBUS_CONSOLE = "https://www.globus.org/app/console/tasks/"
-DISPLAY_ONLY_SIZE = 50000
-PAUSE_SIZE = 1000
+DISPLAY_ONLY_SIZE = NOTIFY_SIZE
+PAUSE_SIZE = NOTIFY_SIZE
+SRCDEST_FILES = 500
 SLEEP_DELAY = 3600
-SLEEP_DELAY = 300
-# To keep things simple, this is the same test space on jyc, bw, and nearline
+# dictionary for testing to maintain state of tasks that would have been paused
+mytaskpaused = {}
 TOKEN_FILE = 'refresh-tokens.json'
 REDIRECT_URI = 'https://auth.globus.org/v2/web/auth-code'
 SCOPES = ('openid email profile '
@@ -124,11 +124,13 @@ def my_endpoint_manager_task_list(tclient,ep):
                 source_total_bps += task["effective_bytes_per_second"]
                 source_total_tasks += 1
             if (task["destination_endpoint_id"] == ep) and (task["source_endpoint_id"] == ep):
-                if (task["owner_string"] == "arnoldg@globusid.org"):
-                    if not task["is_paused"]:
-                        tclient.endpoint_manager_pause_tasks([task["task_id"] ],"SRC and DEST endpoint are the same.  Please contact help+bw@ncsa.illinois.edu .")
+                if task["files"] > SRCDEST_FILES: 
+                    if mytaskpaused.get(str(task["task_id"])) == None:
+    #               if not task["is_paused"]:
+    #                   tclient.endpoint_manager_pause_tasks([task["task_id"] ],"SRC and DEST endpoint are the same.  A new Jira issue has been created.")
                         print("{} for {} PAUSED.".format(task["task_id"],task["owner_string"]))
                         os.system("echo " + GLOBUS_CONSOLE + str(task["task_id"]) + " | mail -s " + "PAUSED_SRC=DEST:" + task["owner_string"] + " " + RECIPIENTS )
+                        mytaskpaused[str(task["task_id"])] = 1            
                     else:
                         print("{} for {} was already PAUSED.".format(task["task_id"],task["owner_string"]))
                         continue
@@ -139,15 +141,16 @@ def my_endpoint_manager_task_list(tclient,ep):
                 source_total_files += task["files"]
                 source_total_bps += task["effective_bytes_per_second"]
                 source_total_tasks += 1
-            if task["files"] > PAUSE_SIZE:
-                if (task["owner_string"] == "arnoldg@globusid.org"):
-                    if not task["is_paused"]:
-                        tclient.endpoint_manager_pause_tasks([task["task_id"] ],"File Count exceeds endpoint transfer limit.  Please contact help+bw@ncsa.illinois.edu .")
-                        print("{} for {} PAUSED.".format(task["task_id"],task["owner_string"]))
-                        os.system("echo " + GLOBUS_CONSOLE + str(task["task_id"]) + " | mail -s " + "PAUSED_NFILES:" + task["owner_string"] + " " + RECIPIENTS )
-                    else:
-                        print("{} for {} was already PAUSED.".format(task["task_id"],task["owner_string"]))
-                        continue
+            if (task["files"] > PAUSE_SIZE) and (endpoint_is == "DEST"):
+                if mytaskpaused.get(str(task["task_id"])) == None:
+#               if not task["is_paused"]:
+#                   tclient.endpoint_manager_pause_tasks([task["task_id"] ],"File Count exceeds endpoint transfer limit.  A new Jira issue has been created.")
+                    print("{} for {} PAUSED.".format(task["task_id"],task["owner_string"]))
+                    os.system("echo " + GLOBUS_CONSOLE + str(task["task_id"]) + " | mail -s " + "PAUSED_NFILES:" + task["owner_string"] + " " + RECIPIENTS )
+                    mytaskpaused[str(task["task_id"])] = 1
+                else:
+                    print("{} for {} was already PAUSED.".format(task["task_id"],task["owner_string"]))
+                    continue
             if (task["files"] > DISPLAY_ONLY_SIZE) or (endpoint_is == "DEST_SRC"):
                 print("{1:10s} {2:36s} {3:10d} {0}".format(
                     task["owner_string"], endpoint_is,
@@ -205,7 +208,7 @@ def main():
         if os.path.isfile("./large_xfer.txt"):
             print("found large_xfer.txt, handling...")
             os.system("cat -n large_xfer.txt");
-            os.system("mail -s ncsa#Nearline_many_file_xfers " + RECIPIENTS + " < ./large_xfer.txt") 
+#           os.system("mail -s ncsa#Nearline_many_file_xfers " + RECIPIENTS + " < ./large_xfer.txt") 
             os.system("rm large_xfer.txt");
         print("...sleeping {}s...\n".format(SLEEP_DELAY))
         time.sleep(SLEEP_DELAY)
