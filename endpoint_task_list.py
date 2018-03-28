@@ -12,6 +12,7 @@ import os
 import globus_sdk
 import json
 import webbrowser
+import pprint
 
 # some globals
 CLIENT_ID = '231634e4-37cc-4a06-96ce-12a262a62da7'
@@ -129,7 +130,12 @@ def my_endpoint_manager_task_list(tclient,ep):
     #               if not task["is_paused"]:
     #                   tclient.endpoint_manager_pause_tasks([task["task_id"] ],"SRC and DEST endpoint are the same.  A new Jira issue has been created.")
                         print("{} for {} PAUSED.".format(task["task_id"],task["owner_string"]))
-                        os.system("echo " + GLOBUS_CONSOLE + str(task["task_id"]) + " | mail -s " + "PAUSED_SRC=DEST:" + task["owner_string"] + " " + RECIPIENTS )
+                        globus_url =  GLOBUS_CONSOLE + str(task["task_id"])
+                        detail_file = open('task_detail.txt', 'w')
+                        detail_file.write("Click link to view in the GO console: {}\n".format(globus_url))
+                        pprint.pprint(str(task), stream = detail_file, depth = 1, width = 50)
+                        detail_file.close()
+                        os.system("mail -s " + "PAUSED_SRC=DEST:" + task["owner_string"] + " " + RECIPIENTS + " < task_detail.txt")
                         mytaskpaused[str(task["task_id"])] = 1            
                     else:
                         print("{} for {} was already PAUSED.".format(task["task_id"],task["owner_string"]))
@@ -146,7 +152,12 @@ def my_endpoint_manager_task_list(tclient,ep):
 #               if not task["is_paused"]:
 #                   tclient.endpoint_manager_pause_tasks([task["task_id"] ],"File Count exceeds endpoint transfer limit.  A new Jira issue has been created.")
                     print("{} for {} PAUSED.".format(task["task_id"],task["owner_string"]))
-                    os.system("echo " + GLOBUS_CONSOLE + str(task["task_id"]) + " | mail -s " + "PAUSED_NFILES:" + task["owner_string"] + " " + RECIPIENTS )
+                    globus_url =  GLOBUS_CONSOLE + str(task["task_id"])
+                    detail_file = open('task_detail.txt', 'w')
+                    detail_file.write("Click link to view in the GO console: {}\n".format(globus_url))
+                    pprint.pprint(str(task), stream = detail_file, depth = 1, width = 50)
+                    detail_file.close()
+                    os.system("mail -s " + "PAUSED_NFILES:" + task["owner_string"] + " " + RECIPIENTS + " < task_detail.txt" )
                     mytaskpaused[str(task["task_id"])] = 1
                 else:
                     print("{} for {} was already PAUSED.".format(task["task_id"],task["owner_string"]))
