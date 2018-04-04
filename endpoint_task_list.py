@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Monitor Nearline endpoint 
+Monitor Nearline endpoint
 
 
 Based on tutorial and documentation at:
@@ -40,6 +40,7 @@ EP_JYC = "d0ccdc02-6d04-11e5-ba46-22000b92c6ec"
 EP_NEARLINE = "d599008e-6d04-11e5-ba46-22000b92c6ec"
 
 GET_INPUT = getattr(__builtins__, 'raw_input', input)
+
 
 def is_remote_session():
     """ Test if this is a remote ssh session """
@@ -95,50 +96,61 @@ def do_native_app_authentication(client_id, redirect_uri,
     return token_response.by_resource_server
 
 
-def add_notification_line(task,endpoint_is):
+def add_notification_line(task, endpoint_is):
+    """
+    Append task info to a file to send vial email.
+    """
     mail_file = open('large_xfer.txt', 'a')
     mail_file.write("{1:5s} {2:36s} {3:10d} {0}\n".format(
-         task["owner_string"], endpoint_is,
-         task["task_id"], 
-         task["files"])
-         )
-    mail_file.close()    
+        task["owner_string"], endpoint_is,
+        task["task_id"],
+        task["files"]))
+    mail_file.close()
 
-def my_endpoint_manager_task_list(tclient,ep):
+
+def my_endpoint_manager_task_list(tclient, ep):
+    """
+    Monitor the endpoint for potential issues related to transfers:
+        - too many files
+        - DEST == SRC
+    """
     source_total_files = 0
     dest_total_files = 0
     source_total_bps = 0
     dest_total_bps = 0
     source_total_tasks = 0
     dest_total_tasks = 0
-    
-    for task in tclient.endpoint_manager_task_list(filter_endpoint=ep,num_results=None):
-        if (task["status"] == "ACTIVE"):
-            if (task["destination_endpoint_id"] == ep):
+
+    for task in tclient.endpoint_manager_task_list(filter_endpoint=ep, num_results=None):
+        if task["status"] == "ACTIVE":
+            if task["destination_endpoint_id"] == ep:
                 endpoint_is = "DEST"
                 dest_total_files += task["files"]
                 dest_total_bps += task["effective_bytes_per_second"]
                 dest_total_tasks += 1
             else:
-                endpoint_is = "SRC" 
+                endpoint_is = "SRC"
                 source_total_files += task["files"]
                 source_total_bps += task["effective_bytes_per_second"]
                 source_total_tasks += 1
             if (task["destination_endpoint_id"] == ep) and (task["source_endpoint_id"] == ep):
-                if task["files"] > SRCDEST_FILES: 
-                    if mytaskpaused.get(str(task["task_id"])) == None:
+                if task["files"] > SRCDEST_FILES:
+                    if mytaskpaused.get(str(task["task_id"])) is None:
     #               if not task["is_paused"]:
     #                   tclient.endpoint_manager_pause_tasks([task["task_id"] ],"SRC and DEST endpoint are the same.  A new Jira issue has been created.")
-                        print("{} for {} PAUSED.".format(task["task_id"],task["owner_string"]))
-                        globus_url =  GLOBUS_CONSOLE + str(task["task_id"])
+                        print("{} for {} PAUSED.".format(task["task_id"], task["owner_string"]))
+                        globus_url = GLOBUS_CONSOLE + str(task["task_id"])
                         detail_file = open('task_detail.txt', 'w')
-                        detail_file.write("Click link to view in the GO console: {}\n".format(globus_url))
-                        pprint.pprint(str(task), stream = detail_file, depth = 1, width = 50)
+                        detail_file.write("Click link to view in the GO console: {}\n".
+                                          format(globus_url))
+                        pprint.pprint(str(task), stream=detail_file, depth=1, width=50)
                         detail_file.close()
-                        os.system("mail -s " + "PAUSED_SRC=DEST:" + task["owner_string"] + " " + RECIPIENTS + " < task_detail.txt")
-                        mytaskpaused[str(task["task_id"])] = 1            
+                        os.system("mail -s " + "PAUSED_SRC=DEST:" + task["owner_string"] +
+                                  " " + RECIPIENTS + " < task_detail.txt")
+                        mytaskpaused[str(task["task_id"])] = 1
                     else:
-                        print("{} for {} was already PAUSED.".format(task["task_id"],task["owner_string"]))
+                        print("{} for {} was already PAUSED.".format(task["task_id"],
+                                                                     task["owner_string"]))
                         continue
                 endpoint_is = "DEST_SRC"
                 dest_total_files += task["files"]
@@ -148,36 +160,36 @@ def my_endpoint_manager_task_list(tclient,ep):
                 source_total_bps += task["effective_bytes_per_second"]
                 source_total_tasks += 1
             if (task["files"] > PAUSE_SIZE) and (endpoint_is == "DEST"):
-                if mytaskpaused.get(str(task["task_id"])) == None:
+                if mytaskpaused.get(str(task["task_id"])) is None:
 #               if not task["is_paused"]:
 #                   tclient.endpoint_manager_pause_tasks([task["task_id"] ],"File Count exceeds endpoint transfer limit.  A new Jira issue has been created.")
-                    print("{} for {} PAUSED.".format(task["task_id"],task["owner_string"]))
-                    globus_url =  GLOBUS_CONSOLE + str(task["task_id"])
+                    print("{} for {} PAUSED.".format(task["task_id"], task["owner_string"]))
+                    globus_url = GLOBUS_CONSOLE + str(task["task_id"])
                     detail_file = open('task_detail.txt', 'w')
-                    detail_file.write("Click link to view in the GO console: {}\n".format(globus_url))
-                    pprint.pprint(str(task), stream = detail_file, depth = 1, width = 50)
+                    detail_file.write("Click link to view in the GO console: {}\n".
+                                      format(globus_url))
+                    pprint.pprint(str(task), stream=detail_file, depth=1, width=50)
                     detail_file.close()
-                    os.system("mail -s " + "PAUSED_NFILES:" + task["owner_string"] + " " + RECIPIENTS + " < task_detail.txt" )
+                    os.system("mail -s " + "PAUSED_NFILES:" + task["owner_string"] +
+                              " " + RECIPIENTS + " < task_detail.txt")
                     mytaskpaused[str(task["task_id"])] = 1
                 else:
-                    print("{} for {} was already PAUSED.".format(task["task_id"],task["owner_string"]))
+                    print("{} for {} was already PAUSED.".format(task["task_id"],
+                                                                 task["owner_string"]))
                     continue
             if (task["files"] > DISPLAY_ONLY_SIZE) or (endpoint_is == "DEST_SRC"):
                 print("{1:10s} {2:36s} {3:10d} {0}".format(
                     task["owner_string"], endpoint_is,
-                    task["task_id"], 
-                    task["files"])
-                )
+                    task["task_id"],
+                    task["files"]))
                 if (task["files"] > NOTIFY_SIZE) or (endpoint_is == "DEST_SRC"):
-                    add_notification_line(task,endpoint_is)
+                    add_notification_line(task, endpoint_is)
     # end for
     print("...TOTAL.files..tasks..MBps...")
     print("SRC  {:9d}  {:4d}  {:6.1f}".format(
-        source_total_files, source_total_tasks, source_total_bps/MB)
-        )
+        source_total_files, source_total_tasks, source_total_bps/MB))
     print("DEST {:9d}  {:4d}  {:6.1f}".format(
-        dest_total_files, dest_total_tasks, dest_total_bps/MB)
-        )
+        dest_total_files, dest_total_tasks, dest_total_bps/MB))
 
 
 def main():
@@ -215,12 +227,12 @@ def main():
 
     while True:
         print("...Nearline..........task.[ACTIVE]............Nfiles.....owner...")
-        my_endpoint_manager_task_list(tclient,EP_NEARLINE)
+        my_endpoint_manager_task_list(tclient, EP_NEARLINE)
         if os.path.isfile("./large_xfer.txt"):
             print("found large_xfer.txt, handling...")
-            os.system("cat -n large_xfer.txt");
-#           os.system("mail -s ncsa#Nearline_many_file_xfers " + RECIPIENTS + " < ./large_xfer.txt") 
-            os.system("rm large_xfer.txt");
+            os.system("cat -n large_xfer.txt")
+#           os.system("mail -s ncsa#Nearline_many_file_xfers " + RECIPIENTS + " < ./large_xfer.txt")
+            os.system("rm large_xfer.txt")
         print("...sleeping {}s...\n".format(SLEEP_DELAY))
         time.sleep(SLEEP_DELAY)
         # end while
