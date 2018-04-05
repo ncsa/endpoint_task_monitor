@@ -28,7 +28,7 @@ PAUSE_SIZE = NOTIFY_SIZE
 SRCDEST_FILES = 500
 SLEEP_DELAY = 3600
 # dictionary for testing to maintain state of tasks that would have been paused
-mytaskpaused = {}
+MYTASKPAUSED = {}
 TOKEN_FILE = 'refresh-tokens.json'
 REDIRECT_URI = 'https://auth.globus.org/v2/web/auth-code'
 SCOPES = ('openid email profile '
@@ -108,22 +108,19 @@ def add_notification_line(task, endpoint_is):
     mail_file.close()
 
 
-def my_endpoint_manager_task_list(tclient, ep):
+def my_endpoint_manager_task_list(tclient, endpoint):
     """
     Monitor the endpoint for potential issues related to transfers:
         - too many files
         - DEST == SRC
     """
-    source_total_files = 0
-    dest_total_files = 0
-    source_total_bps = 0
-    dest_total_bps = 0
-    source_total_tasks = 0
-    dest_total_tasks = 0
+    source_total_files = dest_total_files = 0
+    source_total_bps = dest_total_bps = 0
+    source_total_tasks = dest_total_tasks = 0
 
-    for task in tclient.endpoint_manager_task_list(filter_endpoint=ep, num_results=None):
+    for task in tclient.endpoint_manager_task_list(filter_endpoint=endpoint, num_results=None):
         if task["status"] == "ACTIVE":
-            if task["destination_endpoint_id"] == ep:
+            if task["destination_endpoint_id"] == endpoint:
                 endpoint_is = "DEST"
                 dest_total_files += task["files"]
                 dest_total_bps += task["effective_bytes_per_second"]
@@ -133,9 +130,9 @@ def my_endpoint_manager_task_list(tclient, ep):
                 source_total_files += task["files"]
                 source_total_bps += task["effective_bytes_per_second"]
                 source_total_tasks += 1
-            if (task["destination_endpoint_id"] == ep) and (task["source_endpoint_id"] == ep):
+            if (task["destination_endpoint_id"] == endpoint) and (task["source_endpoint_id"] == endpoint):
                 if task["files"] > SRCDEST_FILES:
-                    if mytaskpaused.get(str(task["task_id"])) is None:
+                    if MYTASKPAUSED.get(str(task["task_id"])) is None:
     #               if not task["is_paused"]:
     #                   tclient.endpoint_manager_pause_tasks([task["task_id"] ],"SRC and DEST endpoint are the same.  A new Jira issue has been created.")
                         print("{} for {} PAUSED.".format(task["task_id"], task["owner_string"]))
@@ -147,7 +144,7 @@ def my_endpoint_manager_task_list(tclient, ep):
                         detail_file.close()
                         os.system("mail -s " + "PAUSED_SRC=DEST:" + task["owner_string"] +
                                   " " + RECIPIENTS + " < task_detail.txt")
-                        mytaskpaused[str(task["task_id"])] = 1
+                        MYTASKPAUSED[str(task["task_id"])] = 1
                     else:
                         print("{} for {} was already PAUSED.".format(task["task_id"],
                                                                      task["owner_string"]))
@@ -160,7 +157,7 @@ def my_endpoint_manager_task_list(tclient, ep):
                 source_total_bps += task["effective_bytes_per_second"]
                 source_total_tasks += 1
             if (task["files"] > PAUSE_SIZE) and (endpoint_is == "DEST"):
-                if mytaskpaused.get(str(task["task_id"])) is None:
+                if MYTASKPAUSED.get(str(task["task_id"])) is None:
 #               if not task["is_paused"]:
 #                   tclient.endpoint_manager_pause_tasks([task["task_id"] ],"File Count exceeds endpoint transfer limit.  A new Jira issue has been created.")
                     print("{} for {} PAUSED.".format(task["task_id"], task["owner_string"]))
@@ -172,16 +169,15 @@ def my_endpoint_manager_task_list(tclient, ep):
                     detail_file.close()
                     os.system("mail -s " + "PAUSED_NFILES:" + task["owner_string"] +
                               " " + RECIPIENTS + " < task_detail.txt")
-                    mytaskpaused[str(task["task_id"])] = 1
+                    MYTASKPAUSED[str(task["task_id"])] = 1
                 else:
                     print("{} for {} was already PAUSED.".format(task["task_id"],
                                                                  task["owner_string"]))
                     continue
             if (task["files"] > DISPLAY_ONLY_SIZE) or (endpoint_is == "DEST_SRC"):
-                print("{1:10s} {2:36s} {3:10d} {0}".format(
-                    task["owner_string"], endpoint_is,
-                    task["task_id"],
-                    task["files"]))
+                print("{1:10s} {2:36s} {3:10d} {0}".format(task["owner_string"], endpoint_is,
+                                                           task["task_id"],
+                                                           task["files"]))
                 if (task["files"] > NOTIFY_SIZE) or (endpoint_is == "DEST_SRC"):
                     add_notification_line(task, endpoint_is)
     # end for
@@ -200,7 +196,7 @@ def main():
     try:
         # if we already have tokens, load and use them
         tokens = load_tokens_from_file(TOKEN_FILE)
-    except:
+    except IOError:
         pass
 
     if not tokens:
@@ -209,7 +205,7 @@ def main():
 
         try:
             save_tokens_to_file(TOKEN_FILE, tokens)
-        except:
+        except IOError:
             pass
 
     transfer_tokens = tokens['transfer.api.globus.org']
