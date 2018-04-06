@@ -118,48 +118,24 @@ def my_endpoint_manager_task_list(tclient, endpoint):
     source_total_bps = dest_total_bps = 0
     source_total_tasks = dest_total_tasks = 0
 
-    for task in tclient.endpoint_manager_task_list(filter_endpoint=endpoint, num_results=None):
-        if task["status"] == "ACTIVE":
-            if task["destination_endpoint_id"] == endpoint:
-                endpoint_is = "DEST"
-                dest_total_files += task["files"]
-                dest_total_bps += task["effective_bytes_per_second"]
-                dest_total_tasks += 1
-            else:
-                endpoint_is = "SRC"
-                source_total_files += task["files"]
-                source_total_bps += task["effective_bytes_per_second"]
-                source_total_tasks += 1
-            if (task["destination_endpoint_id"] == endpoint) and (task["source_endpoint_id"] == endpoint):
-                if task["files"] > SRCDEST_FILES:
-                    if MYTASKPAUSED.get(str(task["task_id"])) is None:
-    #               if not task["is_paused"]:
-    #                   tclient.endpoint_manager_pause_tasks([task["task_id"] ],"SRC and DEST endpoint are the same.  A new Jira issue has been created.")
-                        print("{} for {} PAUSED.".format(task["task_id"], task["owner_string"]))
-                        globus_url = GLOBUS_CONSOLE + str(task["task_id"])
-                        detail_file = open('task_detail.txt', 'w')
-                        detail_file.write("Click link to view in the GO console: {}\n".
-                                          format(globus_url))
-                        pprint.pprint(str(task), stream=detail_file, depth=1, width=50)
-                        detail_file.close()
-                        os.system("mail -s " + "PAUSED_SRC=DEST:" + task["owner_string"] +
-                                  " " + RECIPIENTS + " < task_detail.txt")
-                        MYTASKPAUSED[str(task["task_id"])] = 1
-                    else:
-                        print("{} for {} was already PAUSED.".format(task["task_id"],
-                                                                     task["owner_string"]))
-                        continue
-                endpoint_is = "DEST_SRC"
-                dest_total_files += task["files"]
-                dest_total_bps += task["effective_bytes_per_second"]
-                dest_total_tasks += 1
-                source_total_files += task["files"]
-                source_total_bps += task["effective_bytes_per_second"]
-                source_total_tasks += 1
-            if (task["files"] > PAUSE_SIZE) and (endpoint_is == "DEST"):
+    for task in tclient.endpoint_manager_task_list(filter_endpoint=endpoint,
+                                                   filter_status="ACTIVE",
+                                                   num_results=None):
+        if task["destination_endpoint_id"] == endpoint:
+            endpoint_is = "DEST"
+            dest_total_files += task["files"]
+            dest_total_bps += task["effective_bytes_per_second"]
+            dest_total_tasks += 1
+        else:
+            endpoint_is = "SRC"
+            source_total_files += task["files"]
+            source_total_bps += task["effective_bytes_per_second"]
+            source_total_tasks += 1
+        if (task["destination_endpoint_id"] == endpoint) and (task["source_endpoint_id"] == endpoint):
+            if task["files"] > SRCDEST_FILES:
                 if MYTASKPAUSED.get(str(task["task_id"])) is None:
 #               if not task["is_paused"]:
-#                   tclient.endpoint_manager_pause_tasks([task["task_id"] ],"File Count exceeds endpoint transfer limit.  A new Jira issue has been created.")
+#                   tclient.endpoint_manager_pause_tasks([task["task_id"] ],"SRC and DEST endpoint are the same.  A new Jira issue has been created.")
                     print("{} for {} PAUSED.".format(task["task_id"], task["owner_string"]))
                     globus_url = GLOBUS_CONSOLE + str(task["task_id"])
                     detail_file = open('task_detail.txt', 'w')
@@ -167,19 +143,44 @@ def my_endpoint_manager_task_list(tclient, endpoint):
                                       format(globus_url))
                     pprint.pprint(str(task), stream=detail_file, depth=1, width=50)
                     detail_file.close()
-                    os.system("mail -s " + "PAUSED_NFILES:" + task["owner_string"] +
+                    os.system("mail -s " + "PAUSED_SRC=DEST:" + task["owner_string"] +
                               " " + RECIPIENTS + " < task_detail.txt")
                     MYTASKPAUSED[str(task["task_id"])] = 1
                 else:
                     print("{} for {} was already PAUSED.".format(task["task_id"],
                                                                  task["owner_string"]))
                     continue
-            if (task["files"] > DISPLAY_ONLY_SIZE) or (endpoint_is == "DEST_SRC"):
-                print("{1:10s} {2:36s} {3:10d} {0}".format(task["owner_string"], endpoint_is,
-                                                           task["task_id"],
-                                                           task["files"]))
-                if (task["files"] > NOTIFY_SIZE) or (endpoint_is == "DEST_SRC"):
-                    add_notification_line(task, endpoint_is)
+            endpoint_is = "DEST_SRC"
+            dest_total_files += task["files"]
+            dest_total_bps += task["effective_bytes_per_second"]
+            dest_total_tasks += 1
+            source_total_files += task["files"]
+            source_total_bps += task["effective_bytes_per_second"]
+            source_total_tasks += 1
+        if (task["files"] > PAUSE_SIZE) and (endpoint_is == "DEST"):
+            if MYTASKPAUSED.get(str(task["task_id"])) is None:
+#               if not task["is_paused"]:
+#                   tclient.endpoint_manager_pause_tasks([task["task_id"] ],"File Count exceeds endpoint transfer limit.  A new Jira issue has been created.")
+                print("{} for {} PAUSED.".format(task["task_id"], task["owner_string"]))
+                globus_url = GLOBUS_CONSOLE + str(task["task_id"])
+                detail_file = open('task_detail.txt', 'w')
+                detail_file.write("Click link to view in the GO console: {}\n".
+                                  format(globus_url))
+                pprint.pprint(str(task), stream=detail_file, depth=1, width=50)
+                detail_file.close()
+                os.system("mail -s " + "PAUSED_NFILES:" + task["owner_string"] +
+                          " " + RECIPIENTS + " < task_detail.txt")
+                MYTASKPAUSED[str(task["task_id"])] = 1
+            else:
+                print("{} for {} was already PAUSED.".format(task["task_id"],
+                                                             task["owner_string"]))
+                continue
+        if (task["files"] > DISPLAY_ONLY_SIZE) or (endpoint_is == "DEST_SRC"):
+            print("{1:10s} {2:36s} {3:10d} {0}".format(task["owner_string"], endpoint_is,
+                                                       task["task_id"],
+                                                       task["files"]))
+            if (task["files"] > NOTIFY_SIZE) or (endpoint_is == "DEST_SRC"):
+                add_notification_line(task, endpoint_is)
     # end for
     print("...TOTAL.files..tasks..MBps...")
     print("SRC  {:9d}  {:4d}  {:6.1f}".format(
