@@ -9,10 +9,11 @@ Based on tutorial and documentation at:
 """
 import time
 import os
-import globus_sdk
 import json
 import webbrowser
 import pprint
+import globus_sdk
+
 
 # some globals
 CLIENT_ID = '231634e4-37cc-4a06-96ce-12a262a62da7'
@@ -131,7 +132,7 @@ def my_endpoint_manager_task_list(tclient, endpoint):
             source_total_files += task["files"]
             source_total_bps += task["effective_bytes_per_second"]
             source_total_tasks += 1
-        if (task["destination_endpoint_id"] == endpoint) and (task["source_endpoint_id"] == endpoint):
+        if task["destination_endpoint_id"] == task["source_endpoint_id"]:
             if task["files"] > SRCDEST_FILES:
                 if MYTASKPAUSED.get(str(task["task_id"])) is None:
 #               if not task["is_paused"]:
