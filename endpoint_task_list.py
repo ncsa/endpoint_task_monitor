@@ -109,6 +109,42 @@ def add_notification_line(task, endpoint_is):
     mail_file.close()
 
 
+def build_go_notify_string_size(task):
+    """
+    Build the string that is sent in the GO pause email when over NOTIFY_SIZE
+    """
+    nfiles = task["files_transferred"]
+    # avoid divide by zero in the average_file_size calculation below
+    if nfiles < 1:
+        nfiles += 1
+    average_file_size = task["bytes_transferred"]/nfiles/(1024*1024)
+    # don't report average_file_size of 0.00 MB, misleading...
+    if average_file_size < 0.01:
+        average_file_size = 0.01
+    globus_url = GLOBUS_CONSOLE + str(task["task_id"])
+    pause_string = "Your transfer " + globus_url
+    pause_string += " has been paused because it contains more than "
+    pause_string += str(NOTIFY_SIZE)
+    pause_string += " files. The average file size for this transfer is "
+    pause_string += "{:6.2f}".format(average_file_size) + " MB. "
+    pause_string += "We recommend bundling files using tools like tar. "
+    pause_string += "A good target file size is at least 1GB."
+    return pause_string
+
+
+def build_go_notify_string_dest(task):
+    """
+    Build the string that is sent in the GO pause email when SRC == DEST
+    """
+    globus_url = GLOBUS_CONSOLE + str(task["task_id"])
+    pause_string = "Your transfer " + globus_url
+    pause_string += " has been paused because it contains more than "
+    pause_string += str(SRCDEST_FILES)
+    pause_string += " files transferring within the same endpoint."
+    pause_string += " Please contact help+bw@ncsa.illinois.edu for assistance."
+    return pause_string
+
+
 def my_endpoint_manager_task_list(tclient, endpoint):
     """
     Monitor the endpoint for potential issues related to transfers:
@@ -135,8 +171,9 @@ def my_endpoint_manager_task_list(tclient, endpoint):
         if task["destination_endpoint_id"] == task["source_endpoint_id"]:
             if task["files"] > SRCDEST_FILES:
                 if MYTASKPAUSED.get(str(task["task_id"])) is None:
-#               if not task["is_paused"]:
-#                   tclient.endpoint_manager_pause_tasks([task["task_id"] ],"SRC and DEST endpoint are the same.  A new Jira issue has been created.")
+                    if not task["is_paused"]:
+                        tclient.endpoint_manager_pause_tasks([task["task_id"]],
+                                                             build_go_notify_string_dest(task))
                     print("{} for {} PAUSED.".format(task["task_id"], task["owner_string"]))
                     globus_url = GLOBUS_CONSOLE + str(task["task_id"])
                     detail_file = open('task_detail.txt', 'w')
@@ -160,8 +197,9 @@ def my_endpoint_manager_task_list(tclient, endpoint):
             source_total_tasks += 1
         if (task["files"] > PAUSE_SIZE) and (endpoint_is == "DEST"):
             if MYTASKPAUSED.get(str(task["task_id"])) is None:
-#               if not task["is_paused"]:
-#                   tclient.endpoint_manager_pause_tasks([task["task_id"] ],"File Count exceeds endpoint transfer limit.  A new Jira issue has been created.")
+                if not task["is_paused"]:
+                    tclient.endpoint_manager_pause_tasks([task["task_id"]],
+                                                         build_go_notify_string_size(task))
                 print("{} for {} PAUSED.".format(task["task_id"], task["owner_string"]))
                 globus_url = GLOBUS_CONSOLE + str(task["task_id"])
                 detail_file = open('task_detail.txt', 'w')
