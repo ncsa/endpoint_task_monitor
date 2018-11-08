@@ -12,8 +12,8 @@ import os
 import json
 import webbrowser
 import pprint
+import sys
 import globus_sdk
-
 
 # some globals
 CLIENT_ID = '231634e4-37cc-4a06-96ce-12a262a62da7'
@@ -24,6 +24,7 @@ NOTIFY_SIZE = 100000
 RECIPIENTS = "gwarnold@illinois.edu,gbauer@illinois.edu"
 RECIPIENTS = "gwarnold@illinois.edu,help+bwstorage@ncsa.illinois.edu"
 GLOBUS_CONSOLE = "https://www.globus.org/app/console/tasks/"
+SUPPORT_EMAIL = "help+bw@ncsa.illinois.edu"
 DISPLAY_ONLY_SIZE = NOTIFY_SIZE
 PAUSE_SIZE = NOTIFY_SIZE
 SRCDEST_FILES = 500
@@ -32,19 +33,16 @@ SLEEP_DELAY = 3600
 MYTASKPAUSED = {}
 TOKEN_FILE = 'refresh-tokens.json'
 REDIRECT_URI = 'https://auth.globus.org/v2/web/auth-code'
-SCOPES = ('openid email profile '
-          'urn:globus:auth:scope:transfer.api.globus.org:all')
+SCOPES = 'openid email profile urn:globus:auth:scope:transfer.api.globus.org:all'
 # endpoints determined by globus cli: globus endpoint search ncsa#jyc
 #  or from globus.org -> "Manage Endpoints" -> endpoint detail, UUID
 EP_BW = "d59900ef-6d04-11e5-ba46-22000b92c6ec"
 EP_JYC = "d0ccdc02-6d04-11e5-ba46-22000b92c6ec"
 EP_NEARLINE = "d599008e-6d04-11e5-ba46-22000b92c6ec"
 
-GET_INPUT = getattr(__builtins__, 'raw_input', input)
-
 
 def is_remote_session():
-    """ Test if this is a remote ssh session """
+    """Test if this is a remote ssh session"""
     return os.environ.get('SSH_TTY', os.environ.get('SSH_CONNECTION'))
 
 
@@ -89,7 +87,7 @@ def do_native_app_authentication(client_id, redirect_uri,
     if not is_remote_session():
         webbrowser.open(url, new=1)
 
-    auth_code = GET_INPUT('Enter the auth code: ').strip()
+    auth_code = input('Enter the auth code: ').strip()
 
     token_response = client.oauth2_exchange_code_for_tokens(auth_code)
 
@@ -116,19 +114,18 @@ def build_go_notify_string_size(task):
     nfiles = task["files_transferred"]
     # avoid divide by zero in the average_file_size calculation below
     if nfiles < 1:
-        nfiles += 1
-    average_file_size = task["bytes_transferred"]/nfiles/(1024*1024)
+        nfiles = 1
+    average_file_size = task["bytes_transferred"] / (nfiles*1024*1024)
     # don't report average_file_size of 0.00 MB, misleading...
     if average_file_size < 0.01:
         average_file_size = 0.01
     globus_url = GLOBUS_CONSOLE + str(task["task_id"])
-    pause_string = "Your transfer " + globus_url
-    pause_string += " has been paused because it contains more than "
-    pause_string += str(NOTIFY_SIZE)
-    pause_string += " files. The average file size for this transfer is "
-    pause_string += "{:6.2f}".format(average_file_size) + " MB. "
-    pause_string += "We recommend bundling files using tools like tar. "
-    pause_string += "A good target file size is at least 1GB."
+    pause_string = (
+        "Your transfer {0} has been paused because it contains more "
+        "than {1:d} files. The average file size for this transfer "
+        "is {2:6.2f} MB. We recommend bundling files using tools "
+        "like 'tar'. A good target file size is at least 1 GB."
+        ).format(globus_url, NOTIFY_SIZE, average_file_size)
     return pause_string
 
 
@@ -137,11 +134,13 @@ def build_go_notify_string_dest(task):
     Build the string that is sent in the GO pause email when SRC == DEST
     """
     globus_url = GLOBUS_CONSOLE + str(task["task_id"])
-    pause_string = "Your transfer " + globus_url
-    pause_string += " has been paused because it contains more than "
-    pause_string += str(SRCDEST_FILES)
-    pause_string += " files transferring within the same endpoint."
-    pause_string += " Please contact help+bw@ncsa.illinois.edu for assistance."
+
+    pause_string = (
+        "Your transfer {0} has been paused because it contains more "
+        "than {1:d} files transferring within the same endpoint. "
+        " Please contact {2}  for assistance."
+        ).format(globus_url, SRCDEST_FILES, SUPPORT_EMAIL)
+
     return pause_string
 
 
@@ -246,7 +245,7 @@ def main():
         try:
             save_tokens_to_file(TOKEN_FILE, tokens)
         except IOError:
-            pass
+            sys.stderr.write("There was an error trying to save tokens to {}.".format(TOKEN_FILE))
 
     transfer_tokens = tokens['transfer.api.globus.org']
 
@@ -274,5 +273,5 @@ def main():
         # end while
 # end def main()
 
-
-main()
+if __name__ == "__main__":
+    main()
