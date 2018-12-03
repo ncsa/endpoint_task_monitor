@@ -122,9 +122,8 @@ def build_go_notify_string_size(task):
     globus_url = GLOBUS_CONSOLE + str(task["task_id"])
     pause_string = (
         "Your transfer {0} has been paused because it contains more "
-        "than {1:d} files. The average file size for this transfer "
-        "is {2:6.2f} MB. We recommend bundling files using tools "
-        "like 'tar'. A good target file size is at least 1 GB."
+        "than {1:d} files. Ave. file size for this transfer "
+        "is {2:6.2f} MB. We recommend bundling files with tar. "
         ).format(globus_url, NOTIFY_SIZE, average_file_size)
     return pause_string
 
