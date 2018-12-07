@@ -5,7 +5,7 @@ Monitor Nearline endpoint
 
 Based on tutorial and documentation at:
    http://globus.github.io/globus-sdk-python/index.html
--Galen Arnold, 2018, NCSA
+-Galen Arnold, Maxim Belkin, 2018, NCSA
 """
 import time
 import os
