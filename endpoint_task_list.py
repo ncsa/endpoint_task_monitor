@@ -28,7 +28,7 @@ MB = 1048576
 NOTIFY_SIZE = 100000
 RECIPIENTS = "gwarnold@illinois.edu,help+bwstorage@ncsa.illinois.edu"
 GLOBUS_CONSOLE = "https://www.globus.org/app/console/tasks/"
-SUPPORT_EMAIL = "help+bw@ncsa.illinois.edu"
+SUPPORT_EMAIL = "help+bw@illinois.edu"
 DISPLAY_ONLY_SIZE = NOTIFY_SIZE
 PAUSE_SIZE = NOTIFY_SIZE
 SRCDEST_FILES = 500
@@ -69,6 +69,19 @@ def load_tokens_from_file(filepath):
     return tokens
 
 
+def load_state_from_file(filepath):
+    """Load paused state."""
+    state = {}
+    try:
+        with open(filepath, 'r') as statefile:
+            state = json.load(statefile)
+    except FileNotFoundError:
+        pass
+    except BaseException:
+        sys.stderr.write("Failed to paused state from {}\n".format(filepath))
+    return state
+
+
 def save_tokens_to_file(filepath, tokens):
     """Save a set of tokens for later use."""
     try:
@@ -77,6 +90,15 @@ def save_tokens_to_file(filepath, tokens):
     except BaseException:
         sys.stderr.write("Failed while saving tokens to {}\n".format(filepath))
         # TOKENS_NOT_SAVED = True
+
+
+def save_state_to_file(filepath, state):
+    """Save a set of tokens for later use."""
+    try:
+        with open(filepath, 'w') as statefile:
+            json.dump(state, statefile)
+    except BaseException:
+        sys.stderr.write("Failed while saving state to {}\n".format(filepath))
 
 
 def update_tokens_file_on_refresh(token_response):
@@ -248,6 +270,7 @@ def my_endpoint_manager_task_list(tclient, endpoint):
         source_total_files, source_total_tasks, source_total_bps/MB))
     print("DEST {:9d}  {:4d}  {:6.1f}".format(
         dest_total_files, dest_total_tasks, dest_total_bps/MB))
+    save_state_to_file("paused_list.json", MYTASKPAUSED)
 
 
 def main():
@@ -293,5 +316,6 @@ def main():
         # end while
 # end def main()
 
+MYTASKPAUSED = load_state_from_file("paused_list.json")
 if __name__ == "__main__":
     main()
