@@ -32,7 +32,7 @@ SUPPORT_EMAIL = "help+bw@illinois.edu"
 DISPLAY_ONLY_SIZE = NOTIFY_SIZE
 PAUSE_SIZE = NOTIFY_SIZE
 SRCDEST_FILES = 500
-SLEEP_DELAY = 3600
+SLEEP_DELAY = 120
 # dictionary for testing to maintain state of tasks that would have been paused
 MYTASKPAUSED = {}
 TOKEN_FILE = 'refresh-tokens.json'
@@ -78,7 +78,7 @@ def load_state_from_file(filepath):
     except FileNotFoundError:
         pass
     except BaseException:
-        sys.stderr.write("Failed to paused state from {}\n".format(filepath))
+        sys.stderr.write("Failed to read paused state from {}\n".format(filepath))
     return state
 
 
@@ -164,11 +164,16 @@ def build_go_notify_string_size(task):
         average_file_size = 0.01
     globus_url = GLOBUS_CONSOLE + str(task["task_id"])
     pause_string = (
-        "Your transfer {0} has been paused because it contains more "
-        "than {1:d} files. Ave. file size for this transfer "
+        "Transfer {0} has been paused because it exceeds the "
+        "{1:d} aggregate files limit. Ave. file size for transfers "
         "is {2:6.2f} MB. We recommend bundling files with tar. "
         ).format(globus_url, NOTIFY_SIZE, average_file_size)
     return pause_string
+"""
+Be careful with the pause_string lengths.  They're limited to 255 char and beyond that you'll
+see:
+globus_sdk.exc.TransferAPIError: (400, 'BadRequest', 'message too long', 'eJutWqZZP')
+"""
 
 
 def build_go_notify_string_dest(task):
@@ -195,6 +200,13 @@ def my_endpoint_manager_task_list(tclient, endpoint):
     source_total_files = dest_total_files = 0
     source_total_bps = dest_total_bps = 0
     source_total_tasks = dest_total_tasks = 0
+    owner_sum = {}
+    # get all of the owner_sum key/values initialized for later accumulation
+    # at the following main loop, looking for aggregate over the limit
+    for task in tclient.endpoint_manager_task_list(filter_endpoint=endpoint,
+                                                   filter_status="ACTIVE",
+                                                   num_results=None):
+        owner_sum[task["owner_string"]] = 0
 
     for task in tclient.endpoint_manager_task_list(filter_endpoint=endpoint,
                                                    filter_status="ACTIVE",
@@ -240,8 +252,12 @@ def my_endpoint_manager_task_list(tclient, endpoint):
             source_total_files += task["files"]
             source_total_bps += task["effective_bytes_per_second"]
             source_total_tasks += 1
+        # accumulate multiple transfers into owner_sum dictionary to detect
+        # exceeded PAUSE_SIZE with multiple concurrent transfer
+        if endpoint_is == "DEST":
+            owner_sum[task["owner_string"]] += task["files"]
 
-        if (task["files"] > PAUSE_SIZE) and (endpoint_is == "DEST"):
+        if (owner_sum[task["owner_string"]] > PAUSE_SIZE) and (endpoint_is == "DEST"):
             if MYTASKPAUSED.get(str(task["task_id"])) is None:
                 if not task["is_paused"]:
                     tclient.endpoint_manager_pause_tasks([task["task_id"]],
