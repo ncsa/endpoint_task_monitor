@@ -8,7 +8,7 @@ Based on tutorial and documentation at:
 """
 import os
 import re
-import subprocess
+import socket
 import json
 import webbrowser
 import sys
@@ -16,7 +16,7 @@ from getpass import getpass
 import globus_sdk
 
 # some globals
-CLIENT_ID = 'your-id-here-12a262a62da7'
+CLIENT_ID = '231634e4-37cc-4a06-96ce-12a262a62da7'
 MB = 1048576
 TOKEN_FILE = 'refresh-tokens-bw.json'
 REDIRECT_URI = 'https://auth.globus.org/v2/web/auth-code'
@@ -101,24 +101,20 @@ def my_endpoint_manager_server_check(tclient, endpoint):
 
 
     myendpoint = tclient.endpoint_manager_get_endpoint(endpoint, num_results=None)
+    socket.setdefaulttimeout(20)
     # the DATA section contains the list of servers for an endpoint
     for server in myendpoint["DATA"]:
-        mygsiftpstring = "http://" + server["hostname"] + ":2811"
-        # bwpy python 3.5.5, and older version of curl circa 2015-2016
-        # mycheck= subprocess.run(["curl",mygsiftpstring],
-        #                         stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=15)
-        # python 3.7.5 on kali development platform , latest and greatest 2020
-        mycheck = subprocess.run(["curl", "--http0.9", mygsiftpstring],
-                                 capture_output=True, timeout=15)
-        if re.search("GridFTP Server", str(mycheck.stdout), flags=0):
-            print(server["hostname"], " :ok")
-        # Sometimes curl will crash python in subprocess.run above
-        # and other times it returns an error to be caught here.
-        # Note, this code will crash or exit on the 1st unresponsive server.
-        # There may be other servers down/unresponsive for an endpoint.
-        # The purpose is to fail a Jenkins test.
-        if mycheck.returncode:
-            print(server["hostname"], " :NOT ok")
+        print("{} ".format(server["hostname"]), end="")
+        mysock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        mysock.connect((server["hostname"], 2811))
+        gsiftpdata = mysock.recv(1024)
+        mysock.close()
+        mysockstring = repr(gsiftpdata)
+
+        if re.search("GridFTP Server", mysockstring, flags=0):
+            print("{}".format(":ok"))
+        else:
+            print("{}".format(":NOT ok"))
             sys.exit(-1)
 
 
