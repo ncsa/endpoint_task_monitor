@@ -97,6 +97,10 @@ def my_endpoint_manager_server_check(tclient, endpoint):
     tclient : globus transfer client object
     endpoint : GO endpoint long alpha-numeric id , string
 
+    Returns
+    -------
+    servers_down : count of the servers currently down for this endpoint
+
     """
 
 
@@ -105,7 +109,7 @@ def my_endpoint_manager_server_check(tclient, endpoint):
     servers_down = 0
     # the DATA section contains the list of servers for an endpoint
     for server in myendpoint["DATA"]:
-        print("{} ".format(server["hostname"]), end="")
+        print("   {} ".format(server["hostname"]), end="")
         mysock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             mysock.connect((server["hostname"], 2811))
@@ -121,9 +125,8 @@ def my_endpoint_manager_server_check(tclient, endpoint):
         if re.search("GridFTP Server", mysockstring, flags=0):
             print("{}".format(":ok"))
     if servers_down > 0:
-        print("### {} server(s) were down ###".format(servers_down))
-        # exit with failure for handling by Jenkins test harness
-        sys.exit(-1)
+        print("   ^^^ {} server(s) were down".format(servers_down))
+    return servers_down
 
 
 def main():
@@ -157,6 +160,7 @@ def main():
     tclient = globus_sdk.TransferClient(authorizer=authorizer)
 
     # for the GO endpoints listed above ...
+    total_servers_down = 0
     for endpoint in my_end_points:
         # Find the endpoint with search so that a replaced endpoint
         # with a replacement id will still be checked.
@@ -166,7 +170,10 @@ def main():
             epsearchstring = "^" + endpoint + "$"
             if re.search(epsearchstring, myep['display_name'], flags=0):
                 print("-->", myep['display_name'], myep['id'])
-                my_endpoint_manager_server_check(tclient, myep['id'])
+                total_servers_down += my_endpoint_manager_server_check(tclient, myep['id'])
+    if total_servers_down > 0:
+        # for the Jenkins test harness
+        sys.exit(-1)
 
 # end def main()
 
