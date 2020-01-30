@@ -102,20 +102,28 @@ def my_endpoint_manager_server_check(tclient, endpoint):
 
     myendpoint = tclient.endpoint_manager_get_endpoint(endpoint, num_results=None)
     socket.setdefaulttimeout(20)
+    servers_down = 0
     # the DATA section contains the list of servers for an endpoint
     for server in myendpoint["DATA"]:
         print("{} ".format(server["hostname"]), end="")
         mysock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        mysock.connect((server["hostname"], 2811))
+        try:
+            mysock.connect((server["hostname"], 2811))
+        except socket.error as sockerr:
+            print(sockerr)
+            mysock.close()
+            servers_down += 1
+            continue
         gsiftpdata = mysock.recv(1024)
         mysock.close()
         mysockstring = repr(gsiftpdata)
 
         if re.search("GridFTP Server", mysockstring, flags=0):
             print("{}".format(":ok"))
-        else:
-            print("{}".format(":NOT ok"))
-            sys.exit(-1)
+    if servers_down > 0:
+        print("### {} server(s) were down ###".format(servers_down))
+        # exit with failure for handling by Jenkins test harness
+        sys.exit(-1)
 
 
 def main():
