@@ -17,7 +17,7 @@ from getpass import getpass
 import globus_sdk
 
 # some globals
-CLIENT_ID = '231634e4-37cc-4a06-96ce-12a262a62da7'
+CLIENT_ID = '2316-your-id-here-62da7'
 MB = 1048576
 TOKEN_FILE = 'refresh-tokens-bw.json'
 REDIRECT_URI = 'https://auth.globus.org/v2/web/auth-code'
