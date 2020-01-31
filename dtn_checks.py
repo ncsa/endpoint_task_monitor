@@ -16,7 +16,7 @@ from getpass import getpass
 import globus_sdk
 
 # some globals
-CLIENT_ID = '231634e4-37cc-4a06-96ce-12a262a62da7'
+CLIENT_ID = 'your-client-id-12a262a62da7'
 MB = 1048576
 TOKEN_FILE = 'refresh-tokens-bw.json'
 REDIRECT_URI = 'https://auth.globus.org/v2/web/auth-code'
@@ -105,7 +105,7 @@ def my_endpoint_manager_server_check(tclient, endpoint):
 
 
     myendpoint = tclient.endpoint_manager_get_endpoint(endpoint, num_results=None)
-    socket.setdefaulttimeout(20)
+    socket.setdefaulttimeout(15)
     servers_down = 0
     # the DATA section contains the list of servers for an endpoint
     for server in myendpoint["DATA"]:
@@ -123,9 +123,11 @@ def my_endpoint_manager_server_check(tclient, endpoint):
         mysockstring = repr(gsiftpdata)
 
         if re.search("GridFTP Server", mysockstring, flags=0):
-            print("{}".format(":ok"))
+            print("{}".format(":gsiftp service UP"))
+        else:
+            print("{}".format(":UNKNOWN response"))
     if servers_down > 0:
-        print("   ^^^ {} server(s) were down".format(servers_down))
+        print("###^^^^^ {} server(s) were down ^^^^^###".format(servers_down))
     return servers_down
 
 
@@ -136,7 +138,11 @@ def main():
     my_end_points = (
         'ncsa#BlueWaters',
         'ncsa#BlueWaters-Duo',
+        'ncsa#BlueWatersAWS',
+        'BW Google Drive Endpoint',
+        'ncsa#jyc',
         'umn#pgc-terranova',
+        'illinois_duo',
         )
 
     tokens = load_tokens_from_file(TOKEN_FILE)
@@ -171,6 +177,11 @@ def main():
             if re.search(epsearchstring, myep['display_name'], flags=0):
                 print("-->", myep['display_name'], myep['id'])
                 total_servers_down += my_endpoint_manager_server_check(tclient, myep['id'])
+    # Something is broken in the endpoint_search for illinois#iccp so this one is handled
+    # separately.  The id below is updated manually from the GO web page of endpoints.
+    illinois_iccp_id = "9cd89c31-6d04-11e5-ba46-22000b92c6ec"
+    print("--> illinois#iccp", illinois_iccp_id)
+    total_servers_down += my_endpoint_manager_server_check(tclient, illinois_iccp_id)
     if total_servers_down > 0:
         # for the Jenkins test harness
         sys.exit(-1)
